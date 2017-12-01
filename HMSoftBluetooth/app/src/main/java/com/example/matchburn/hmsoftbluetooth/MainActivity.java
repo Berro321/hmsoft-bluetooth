@@ -11,6 +11,10 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.Toast;
 
+/*
+    Made by: Francisco Ramirez
+    Get started screen
+ */
 public class MainActivity extends AppCompatActivity {
 
     View view;
@@ -35,7 +39,7 @@ public class MainActivity extends AppCompatActivity {
                 startActivity(secondPage);
 
 
-                Toast.makeText(getApplicationContext(),myString,Toast.LENGTH_LONG).show();
+                Toast.makeText(getApplicationContext(),myString,Toast.LENGTH_SHORT).show();
             }
         });
 

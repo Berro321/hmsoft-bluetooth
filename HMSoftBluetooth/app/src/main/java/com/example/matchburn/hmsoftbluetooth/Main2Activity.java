@@ -40,6 +40,8 @@ import java.util.List;
 import java.util.UUID;
 /*
     Main Activity that will send Input to the board
+
+    Created by: Betto Cerrillos and Francisco Ramirez
  */
 
 public class Main2Activity extends AppCompatActivity {
@@ -217,7 +219,7 @@ public class Main2Activity extends AppCompatActivity {
         }
         //trackTime.start();
     }
-    public class timerThread extends Thread implements Runnable{
+    private class timerThread extends Thread implements Runnable{
         private volatile boolean exit = false;
         @Override
         public void run() {
@@ -245,10 +247,6 @@ public class Main2Activity extends AppCompatActivity {
         }
         public void end(){
             exit = true;
-        }
-        public void restart(){
-            exit = true;
-            run();
         }
     }
     @Override
@@ -415,8 +413,12 @@ public class Main2Activity extends AppCompatActivity {
     }
 
     public void startGraph(){
+
+        //Make sure that the application is actually connected to the device
         if(BluetoothApp.getApplication().getService()==null)
             return;
+        //Make sure timer ends on time
+        trackTime.end();
         Intent intent = new Intent(this,SecondaryGraph.class);
         startActivity(intent);
     }
@@ -431,9 +433,6 @@ public class Main2Activity extends AppCompatActivity {
         //Toast.makeText(this,"Sent value " + dataInt, Toast.LENGTH_SHORT).show();
     }
 
-    public void runTime(){
-
-    }
 
     private static IntentFilter makeGattUpdateIntentFilter() {
         final IntentFilter intentFilter = new IntentFilter();
@@ -456,7 +455,7 @@ public class Main2Activity extends AppCompatActivity {
             if (BluetoothLeService.ACTION_GATT_CONNECTED.equals(action)) {
                 mConnected = true;
                 Log.i(TAG,"Connected to HMSOFT!");
-                Toast.makeText(getApplicationContext(),"Connected to HMSoft! Looking for data...",Toast.LENGTH_SHORT).show();
+                Toast.makeText(getApplicationContext(),"Connected to HMSoft!",Toast.LENGTH_SHORT).show();
                 invalidateOptionsMenu();
             } else if (BluetoothLeService.ACTION_GATT_DISCONNECTED.equals(action)) {
                 mConnected = false;
@@ -520,7 +519,7 @@ public class Main2Activity extends AppCompatActivity {
                     Log.i(TAG,"Characteristic: " + tempUUID);
                     if(tempUUID.equals(HMSoftChar)){
                         Log.i(TAG,"Found Characteristics, Reading....");
-                        Toast.makeText(getApplicationContext(),"Found data!",Toast.LENGTH_SHORT).show();
+                        //Toast.makeText(getApplicationContext(),"Found data!",Toast.LENGTH_SHORT).show();
                         foundChar = true;
                         bluetoothGattCharacteristicHM_SOFT = gattService.getCharacteristic(UUID_HM_SOFT);
                         activateCharacteristic(gattCharacteristic);

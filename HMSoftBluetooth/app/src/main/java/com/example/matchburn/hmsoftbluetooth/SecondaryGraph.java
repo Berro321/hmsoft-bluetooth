@@ -9,6 +9,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
+import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
@@ -27,6 +28,8 @@ import static com.example.matchburn.hmsoftbluetooth.Main2Activity.HMSoftAddress;
 
 /**
  * Created by Matchburn321 on 11/28/2017.
+ *
+ * Displays the graph once the sensors are ready
  */
 
 public class SecondaryGraph extends AppCompatActivity {
@@ -43,6 +46,7 @@ public class SecondaryGraph extends AppCompatActivity {
     private LineGraphSeries<DataPoint> series;
     private int lastX = 0;
     private  GraphView graph;
+    private timerThread trackTime;
 
     @Override
     protected void onCreate(Bundle savedInstance){
@@ -77,19 +81,17 @@ public class SecondaryGraph extends AppCompatActivity {
         graph = (GraphView) findViewById(R.id.graph);
         // data
         series = new LineGraphSeries<DataPoint>();
+        series.setColor(Color.WHITE);
         graph.addSeries(series);
-        // customize a little bit viewport
-        Viewport viewport = graph.getViewport();
-        viewport.setYAxisBoundsManual(true);
-        viewport.setMinY(0);
-        viewport.setMaxY(.5);
-        viewport.setXAxisBoundsManual(true);
-        viewport.setMaxX(10);
-        viewport.setMinX(0);
         graph.getGridLabelRenderer().setHorizontalAxisTitle("Time (s)");
         graph.getGridLabelRenderer().setVerticalAxisTitle("Current (mA)");
-        graph.getGridLabelRenderer().setLabelHorizontalHeight(50);
-        graph.getGridLabelRenderer().setLabelVerticalWidth(60);
+        graph.getGridLabelRenderer().setLabelHorizontalHeight(20);
+        graph.getGridLabelRenderer().setLabelVerticalWidth(30);
+        graph.getGridLabelRenderer().setLabelsSpace(3);
+        graph.getGridLabelRenderer().setNumVerticalLabels(4);
+
+        //Timer for the graph
+        trackTime = new timerThread();
 
     }
 
@@ -104,6 +106,23 @@ public class SecondaryGraph extends AppCompatActivity {
                 startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT);
             }
         }
+
+        //For the graph
+        lastX = 0;
+        graph.removeAllSeries();
+        series.resetData(new DataPoint[]{});
+        graph.addSeries(series);
+        Viewport viewport = graph.getViewport();
+        viewport.setYAxisBoundsManual(true);
+        viewport.setMinY(.01);
+        viewport.setMaxY(.04);
+        viewport.setXAxisBoundsManual(true);
+        viewport.setMaxX(10);
+        viewport.setMinX(0);
+
+        //Keep track of graph timing
+        trackTime = new timerThread();
+        trackTime.start();
     }
 
     @Override
@@ -112,6 +131,12 @@ public class SecondaryGraph extends AppCompatActivity {
         unbindService(mServiceConnection);
         mBluetoothLeService = null;
 
+    }
+
+    @Override
+    public void onPause(){
+        super.onPause();
+        trackTime.end();
     }
 
     //Check permissions of device
@@ -151,6 +176,38 @@ public class SecondaryGraph extends AppCompatActivity {
         }
     };
 
+    //Used to keep timing on the graph
+    private class timerThread extends Thread implements Runnable{
+        private volatile boolean exit = false;
+        @Override
+        public void run() {
+            // we go on forever
+            for (;;) {
+                if(exit)
+                    break;
+                runOnUiThread(new Runnable() {
+
+                    @Override
+                    public void run() {
+                        lastX += .1;
+                    }
+                });
+
+                // sleep to slow down the add of entries
+                //Not always 100% accurate TODO: different way
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException e) {
+                    // manage error ...
+                    Log.i(TAG,"ERROR IN THREAD!");
+                }
+            }
+        }
+        public void end(){
+            exit = true;
+        }
+    }
+
     private static IntentFilter makeGattUpdateIntentFilter() {
         final IntentFilter intentFilter = new IntentFilter();
         intentFilter.addAction(BluetoothLeService.ACTION_GATT_CONNECTED);
@@ -184,41 +241,39 @@ public class SecondaryGraph extends AppCompatActivity {
             } else if (BluetoothLeService.ACTION_DATA_AVAILABLE.equals(action)) {
                 String returnedVal = intent.getStringExtra(BluetoothLeService.EXTRA_DATA);
                 //remove the Ma to convert to an actual usable value
-                double returnedValDouble = Double.parseDouble(returnedVal.substring(0,returnedVal.length()-2));
-                series.appendData(new DataPoint(intToDouble(lastX++),returnedValDouble),true,40);
-                //Read current
-                showValue.setText(intent.getStringExtra(BluetoothLeService.EXTRA_DATA));
+                double returnedValDouble;
+                //showData.setText(returnedVal);
+                if(checkIfValidDouble(returnedVal)){
+                    Log.i(TAG,"" +  lastX);
+                    returnedValDouble = Double.parseDouble(getValidDouble(returnedVal));
+                    series.appendData(new DataPoint(lastX,returnedValDouble),true,12);
+
+                }
             }
         }
     };
 
+    //Checks that the data is valid (to prevent errors)
+    private boolean checkIfValidDouble(String s){
+        return s.substring(0,1).equals("0");
+    }
+
+    //Filters out the mA and micro symbols out of the string to get a valid double that displays
+    private String getValidDouble(String s){
+        String returnedString = "";
+        for(int i = 0; i < s.length(); i++){
+            String current = s.substring(i,i+1);
+            if(current.equals(" ") || current.equals("μ") || current.equals("m"))
+                break;
+            returnedString+=current;
+        }
+        return returnedString;
+    }
+
     public void backToMain(View v){
+        trackTime.end();
         Intent intent = new Intent(this,Main2Activity.class);
         startActivity(intent);
     }
 
-    public double intToDouble(int num){
-        switch(num){
-            case 1:
-                return 0.1;
-            case 2:
-                return 0.2;
-            case 3:
-                return 0.3;
-            case 4:
-                return 0.4;
-            case 5:
-                return 0.5;
-            case 6:
-                return 0.6;
-            case 7:
-                return 0.7;
-            case 8:
-                return 0.8;
-            case 9:
-                return 0.9;
-            default:
-                return -1;
-        }
-    }
 }
