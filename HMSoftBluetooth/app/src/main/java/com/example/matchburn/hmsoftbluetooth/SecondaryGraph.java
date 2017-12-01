@@ -85,9 +85,9 @@ public class SecondaryGraph extends AppCompatActivity {
         graph.addSeries(series);
         graph.getGridLabelRenderer().setHorizontalAxisTitle("Time (s)");
         graph.getGridLabelRenderer().setVerticalAxisTitle("Current (mA)");
-        graph.getGridLabelRenderer().setLabelHorizontalHeight(20);
-        graph.getGridLabelRenderer().setLabelVerticalWidth(30);
-        graph.getGridLabelRenderer().setLabelsSpace(3);
+        //graph.getGridLabelRenderer().setLabelHorizontalHeight(20);
+        //graph.getGridLabelRenderer().setLabelVerticalWidth(30);
+        //graph.getGridLabelRenderer().setLabelsSpace(3);
         graph.getGridLabelRenderer().setNumVerticalLabels(4);
 
         //Timer for the graph
@@ -114,8 +114,8 @@ public class SecondaryGraph extends AppCompatActivity {
         graph.addSeries(series);
         Viewport viewport = graph.getViewport();
         viewport.setYAxisBoundsManual(true);
-        viewport.setMinY(.01);
-        viewport.setMaxY(.04);
+        viewport.setMinY(-.04);
+        viewport.setMaxY(-.01);
         viewport.setXAxisBoundsManual(true);
         viewport.setMaxX(10);
         viewport.setMinX(0);
