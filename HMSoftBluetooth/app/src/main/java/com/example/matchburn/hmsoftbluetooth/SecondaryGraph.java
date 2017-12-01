@@ -44,9 +44,9 @@ public class SecondaryGraph extends AppCompatActivity {
 
     //GraphView variables
     private LineGraphSeries<DataPoint> series;
-    private int lastX = 0;
+    private double lastX2 = 0;
     private  GraphView graph;
-    private timerThread trackTime;
+    private timerThread2 trackTime;
 
     @Override
     protected void onCreate(Bundle savedInstance){
@@ -73,12 +73,14 @@ public class SecondaryGraph extends AppCompatActivity {
 
         //the Bluetooth Service should exist by now, so we get it from the application
         mBluetoothLeService = BluetoothApp.getApplication().getService();
-        showValue.setText("I am done");
+        if(BluetoothApp.getApplication().getService() == null)
+            Log.i(TAG,"BluetoothLeService is null");
+        //No Data
         Intent gattServiceIntent = new Intent(this, BluetoothLeService.class);
         bindService(gattServiceIntent, mServiceConnection, BIND_AUTO_CREATE);
         registerReceiver(mGattUpdateReceiver, makeGattUpdateIntentFilter());
         //For the graph in this page
-        graph = (GraphView) findViewById(R.id.graph);
+        graph = (GraphView) findViewById(R.id.graphView);
         // data
         series = new LineGraphSeries<DataPoint>();
         series.setColor(Color.WHITE);
@@ -91,7 +93,7 @@ public class SecondaryGraph extends AppCompatActivity {
         graph.getGridLabelRenderer().setNumVerticalLabels(4);
 
         //Timer for the graph
-        trackTime = new timerThread();
+        trackTime = new timerThread2();
 
     }
 
@@ -108,7 +110,7 @@ public class SecondaryGraph extends AppCompatActivity {
         }
 
         //For the graph
-        lastX = 0;
+        lastX2 = 0;
         graph.removeAllSeries();
         series.resetData(new DataPoint[]{});
         graph.addSeries(series);
@@ -121,7 +123,7 @@ public class SecondaryGraph extends AppCompatActivity {
         viewport.setMinX(0);
 
         //Keep track of graph timing
-        trackTime = new timerThread();
+        trackTime = new timerThread2();
         trackTime.start();
     }
 
@@ -166,7 +168,7 @@ public class SecondaryGraph extends AppCompatActivity {
             // Automatically connects to the device upon successful start-up initialization.
             mBluetoothLeService.connect(HMSoftAddress);
             //Used so it can later be accessed in another activity
-            BluetoothApp.getApplication().setBluetoothLe(mBluetoothLeService);
+            //BluetoothApp.getApplication().setBluetoothLe(mBluetoothLeService);
             Log.i(TAG,"Connected to hmSoft!");
         }
 
@@ -177,7 +179,7 @@ public class SecondaryGraph extends AppCompatActivity {
     };
 
     //Used to keep timing on the graph
-    private class timerThread extends Thread implements Runnable{
+    private class timerThread2 extends Thread implements Runnable{
         private volatile boolean exit = false;
         @Override
         public void run() {
@@ -189,7 +191,7 @@ public class SecondaryGraph extends AppCompatActivity {
 
                     @Override
                     public void run() {
-                        lastX += .1;
+                        lastX2 += .1;
                     }
                 });
 
@@ -242,11 +244,12 @@ public class SecondaryGraph extends AppCompatActivity {
                 String returnedVal = intent.getStringExtra(BluetoothLeService.EXTRA_DATA);
                 //remove the Ma to convert to an actual usable value
                 double returnedValDouble;
-                //showData.setText(returnedVal);
+                showValue.setText(returnedVal);
                 if(checkIfValidDouble(returnedVal)){
-                    Log.i(TAG,"" +  lastX);
+                    //Log.i(TAG,returnedVal);
+                    Log.i(TAG,"" +  lastX2);
                     returnedValDouble = Double.parseDouble(getValidDouble(returnedVal));
-                    series.appendData(new DataPoint(lastX,returnedValDouble),true,12);
+                    series.appendData(new DataPoint(lastX2,returnedValDouble),true,12);
 
                 }
             }
@@ -255,7 +258,7 @@ public class SecondaryGraph extends AppCompatActivity {
 
     //Checks that the data is valid (to prevent errors)
     private boolean checkIfValidDouble(String s){
-        return s.substring(0,1).equals("0");
+        return (s.substring(0,1).equals("0") || s.substring(0,1).equals("-"));
     }
 
     //Filters out the mA and micro symbols out of the string to get a valid double that displays
