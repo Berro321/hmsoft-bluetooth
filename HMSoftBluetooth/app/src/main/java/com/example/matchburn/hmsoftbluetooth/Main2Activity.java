@@ -136,7 +136,7 @@ public class Main2Activity extends AppCompatActivity {
         //Setting up the Graph View
         // we get graph view instance
        graph = (GraphView) findViewById(R.id.graph);
-        // data
+        //Setup how the graph looks
         series = new LineGraphSeries<DataPoint>();
         series.setColor(Color.WHITE);
         graph.addSeries(series);
