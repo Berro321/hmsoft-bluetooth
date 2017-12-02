@@ -86,7 +86,7 @@ public class SecondaryGraph extends AppCompatActivity {
         series.setColor(Color.WHITE);
         graph.addSeries(series);
         graph.getGridLabelRenderer().setHorizontalAxisTitle("Time (s)");
-        graph.getGridLabelRenderer().setVerticalAxisTitle("Current (mA)");
+        graph.getGridLabelRenderer().setVerticalAxisTitle("Current (μA)");
         //graph.getGridLabelRenderer().setLabelHorizontalHeight(20);
         //graph.getGridLabelRenderer().setLabelVerticalWidth(30);
         //graph.getGridLabelRenderer().setLabelsSpace(3);
@@ -247,7 +247,7 @@ public class SecondaryGraph extends AppCompatActivity {
                 showValue.setText(returnedVal);
                 if(checkIfValidDouble(returnedVal)){
                     //Log.i(TAG,returnedVal);
-                    Log.i(TAG,"" +  lastX2);
+                    //Log.i(TAG,"" +  lastX2);
                     returnedValDouble = Double.parseDouble(getValidDouble(returnedVal));
                     series.appendData(new DataPoint(lastX2,returnedValDouble),true,12);
 

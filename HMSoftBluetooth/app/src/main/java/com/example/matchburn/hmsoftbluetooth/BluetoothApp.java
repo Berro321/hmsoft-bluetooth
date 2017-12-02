@@ -1,6 +1,7 @@
 package com.example.matchburn.hmsoftbluetooth;
 
 import android.app.Application;
+import android.bluetooth.BluetoothGattCharacteristic;
 
 /**
  * Created by Matchburn321 on 11/28/2017.
@@ -15,6 +16,8 @@ public class BluetoothApp extends Application {
     }
 
     BluetoothLeService mBLE = null;
+    BluetoothGattCharacteristic mBGC = null;
+
     public void onCreate(){
         super.onCreate();
 
@@ -24,7 +27,9 @@ public class BluetoothApp extends Application {
     public void setBluetoothLe(BluetoothLeService in){
         mBLE = in;
     }
+    public void setBluetoothGattCharacteristic(BluetoothGattCharacteristic in){mBGC=in;}
     public BluetoothLeService getService(){
         return mBLE;
     }
+    public BluetoothGattCharacteristic getGattCharacteristic(){return mBGC;}
 }

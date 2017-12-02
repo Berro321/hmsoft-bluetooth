@@ -203,15 +203,18 @@ public class Main2Activity extends AppCompatActivity {
 
         if(readyTo || BluetoothApp.getApplication().getService()!=null){
             foundChar= true;
+            //checkIfCharacteristic(BluetoothApp.getApplication().getService().getSupportedGattServices());
             //If restarted, bypass scanning
-            if(BluetoothApp.getApplication().getService()!=null && mBluetoothLeService==null)
+            if(BluetoothApp.getApplication().getService()!=null && mBluetoothLeService==null) {
+                bluetoothGattCharacteristicHM_SOFT = BluetoothApp.getApplication().getGattCharacteristic();
                 mBluetoothLeService = BluetoothApp.getApplication().getService();
+                Log.i(TAG,"mBluetoothLeService has been set, null?: " + (mBluetoothLeService==null));
+            }
             registerReceiver(mGattUpdateReceiver, makeGattUpdateIntentFilter());
             if (mBluetoothLeService != null) {
                 final boolean result = mBluetoothLeService.connect(HMSoftAddress);
                 Log.d(TAG, "Connect request result=" + result);
             }
-            checkIfCharacteristic(BluetoothApp.getApplication().getService().getSupportedGattServices());
         }
 
         //Keep track of graph timing
@@ -479,7 +482,7 @@ public class Main2Activity extends AppCompatActivity {
                 }
                 showData.setText(returnedVal);
                 if(checkIfValidDouble(returnedVal)){
-                    Log.i(TAG,"" +  lastX);
+                    //Log.i(TAG,"" +  lastX);
                     returnedValDouble = Double.parseDouble(getValidDouble(returnedVal));
                     series.appendData(new DataPoint(lastX,returnedValDouble),true,12);
 
@@ -527,6 +530,8 @@ public class Main2Activity extends AppCompatActivity {
                         foundChar = true;
                         Log.i(TAG,"Obtained characteristic");
                         bluetoothGattCharacteristicHM_SOFT = gattService.getCharacteristic(UUID_HM_SOFT);
+                        //Add to application file
+                        BluetoothApp.getApplication().setBluetoothGattCharacteristic(bluetoothGattCharacteristicHM_SOFT);
                         activateCharacteristic(gattCharacteristic);
                     }
                 }
