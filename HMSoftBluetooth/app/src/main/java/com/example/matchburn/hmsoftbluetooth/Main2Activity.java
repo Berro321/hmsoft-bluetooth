@@ -68,7 +68,7 @@ public class Main2Activity extends AppCompatActivity {
     private static final String TAG = "Main2Activity";
 
     //Information about board
-    public static final String HMSoftAddress = "C8:FD:19:87:AA:43";
+    public static final String HMSoftAddress = "9C:1D:04:E0:BD";
     public static final String HMSoftServ = "0000ffe0-0000-1000-8000-00805f9b34fb";
     public  static final String HMSoftChar = "0000ffe1-0000-1000-8000-00805f9b34fb";
 
