@@ -9,10 +9,13 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.IBinder;
+import android.os.SystemClock;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
@@ -23,6 +26,11 @@ import com.jjoe64.graphview.GraphView;
 import com.jjoe64.graphview.Viewport;
 import com.jjoe64.graphview.series.DataPoint;
 import com.jjoe64.graphview.series.LineGraphSeries;
+
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
 
 import static com.example.matchburn.hmsoftbluetooth.Main2Activity.HMSoftAddress;
 
@@ -37,6 +45,11 @@ public class SecondaryGraph extends AppCompatActivity {
     private final String TAG = ".SecondaryGraph";
     View view;
 
+    //Used for recording data
+    private File dirpath;
+    private FileOutputStream outputStream;
+    private boolean isRecording;
+
     TextView showValue;
     private BluetoothLeService mBluetoothLeService;
 
@@ -46,7 +59,8 @@ public class SecondaryGraph extends AppCompatActivity {
     private LineGraphSeries<DataPoint> series;
     private double lastX2 = 0;
     private  GraphView graph;
-    private timerThread2 trackTime;
+    private long startTime;
+    private boolean startedGraphing;
 
     @Override
     protected void onCreate(Bundle savedInstance){
@@ -69,7 +83,7 @@ public class SecondaryGraph extends AppCompatActivity {
             finish();
             return;
         }
-        checkBTPermissions();
+        checkBTAndWritePermissions();
 
         //the Bluetooth Service should exist by now, so we get it from the application
         mBluetoothLeService = BluetoothApp.getApplication().getService();
@@ -92,9 +106,6 @@ public class SecondaryGraph extends AppCompatActivity {
         //graph.getGridLabelRenderer().setLabelsSpace(3);
         graph.getGridLabelRenderer().setNumVerticalLabels(4);
 
-        //Timer for the graph
-        trackTime = new timerThread2();
-
     }
 
     @Override
@@ -116,15 +127,31 @@ public class SecondaryGraph extends AppCompatActivity {
         graph.addSeries(series);
         Viewport viewport = graph.getViewport();
         viewport.setYAxisBoundsManual(true);
-        viewport.setMinY(-.04);
-        viewport.setMaxY(-.01);
+        viewport.setMinY(-12);
+        viewport.setMaxY(0);
         viewport.setXAxisBoundsManual(true);
         viewport.setMaxX(10);
         viewport.setMinX(0);
+        startedGraphing = false;
 
-        //Keep track of graph timing
-        trackTime = new timerThread2();
-        trackTime.start();
+        //Create file to write on and starts writing
+        if(isExternalStorageWritable()) {
+            dirpath = createFile();
+            try {
+                outputStream = new FileOutputStream(dirpath);
+            } catch (FileNotFoundException e) {
+                e.printStackTrace();
+            }
+            isRecording = true;
+            //Write a header
+            String mess = "Date,Time,Sensing Current,µA\n";
+            try {
+                //if(outputStream!=null)
+                outputStream.write(mess.getBytes());
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
     }
 
     @Override
@@ -133,26 +160,86 @@ public class SecondaryGraph extends AppCompatActivity {
         unbindService(mServiceConnection);
         mBluetoothLeService = null;
 
+        //Close writing file
+        try {
+            outputStream.close();
+            outputStream = null;
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     @Override
     public void onPause(){
         super.onPause();
-        trackTime.end();
+        //trackTime.end();
+        isRecording = false; //Stop recording when not in foreground
     }
 
     //Check permissions of device
-    private void checkBTPermissions() {
+    private void checkBTAndWritePermissions() {
         if(Build.VERSION.SDK_INT > Build.VERSION_CODES.LOLLIPOP){
             int permissionCheck = this.checkSelfPermission("Manifest.permission.ACCESS_FINE_LOCATION");
             permissionCheck += this.checkSelfPermission("Manifest.permission.ACCESS_COARSE_LOCATION");
             if (permissionCheck != 0) {
 
-                this.requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION}, 1001); //Any number
+                this.requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.WRITE_EXTERNAL_STORAGE}, 1); //Any number
             }
         }else{
             Log.d(TAG, "checkBTPermissions: No need to check permissions. SDK version < LOLLIPOP.");
         }
+    }
+
+    //Create a file to write on
+    private File createFile(){
+        String timeDate = "[" + BluetoothApp.getDateString() + " " + BluetoothApp.getTimeString() + "]";
+        //Toast.makeText(this,"Clicked!",Toast.LENGTH_LONG).show();
+        File Root = Environment.getExternalStorageDirectory();
+        File dir = new File(Root.getAbsolutePath() + "/HMSOFTOUT");
+        if(!dir.exists())
+            dir.mkdir();
+        File file = new File(dir,"Sensing" + timeDate + ".txt");
+        try {
+            file.createNewFile();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return file;
+    }
+
+    @Override //Used for checking if the permissions were accepted and obtained
+    public void onRequestPermissionsResult(int requestCode,
+                                           String permissions[], int[] grantResults) {
+        switch (requestCode) {
+            case 1: {
+
+                // If request is cancelled, the result arrays are empty.
+                if (grantResults.length > 0
+                        && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+
+                    // permission was granted, yay! Do the
+                    // contacts-related task you need to do.
+                } else {
+
+                    // permission denied, boo! Disable the
+                    // functionality that depends on this permission.
+                    Toast.makeText(SecondaryGraph.this, "Permission denied to read your External storage or Location", Toast.LENGTH_SHORT).show();
+                }
+                return;
+            }
+
+            // other 'case' lines to check for other
+            // permissions this app might request
+        }
+    }
+
+    /* Checks if external storage is available for read and write */
+    public boolean isExternalStorageWritable() {
+        String state = Environment.getExternalStorageState();
+        if (Environment.MEDIA_MOUNTED.equals(state)) {
+            return true;
+        }
+        return false;
     }
 
     // Code to manage Service lifecycle.
@@ -177,38 +264,6 @@ public class SecondaryGraph extends AppCompatActivity {
             mBluetoothLeService = null;
         }
     };
-
-    //Used to keep timing on the graph
-    private class timerThread2 extends Thread implements Runnable{
-        private volatile boolean exit = false;
-        @Override
-        public void run() {
-            // we go on forever
-            for (;;) {
-                if(exit)
-                    break;
-                runOnUiThread(new Runnable() {
-
-                    @Override
-                    public void run() {
-                        lastX2 += .1;
-                    }
-                });
-
-                // sleep to slow down the add of entries
-                //Not always 100% accurate TODO: different way
-                try {
-                    Thread.sleep(100);
-                } catch (InterruptedException e) {
-                    // manage error ...
-                    Log.i(TAG,"ERROR IN THREAD!");
-                }
-            }
-        }
-        public void end(){
-            exit = true;
-        }
-    }
 
     private static IntentFilter makeGattUpdateIntentFilter() {
         final IntentFilter intentFilter = new IntentFilter();
@@ -245,21 +300,31 @@ public class SecondaryGraph extends AppCompatActivity {
                 //remove the Ma to convert to an actual usable value
                 double returnedValDouble;
                 showValue.setText(returnedVal);
-                if(checkIfValidDouble(returnedVal)){
-                    //Log.i(TAG,returnedVal);
+                if(Main2Activity.checkIfValidDouble(returnedVal)){
+                    Log.i(TAG,returnedVal);
                     //Log.i(TAG,"" +  lastX2);
                     returnedValDouble = Double.parseDouble(getValidDouble(returnedVal));
-                    series.appendData(new DataPoint(lastX2,returnedValDouble),true,12);
-
+                    if(!startedGraphing){
+                        startedGraphing = true;
+                        startTime = SystemClock.elapsedRealtime(); //zero time
+                    }
+                    double currentX = (SystemClock.elapsedRealtime() - startTime) / 1000.0;
+                    series.appendData(new DataPoint(currentX,returnedValDouble),true,12);
+                    if(outputStream!=null && isRecording){
+                        //In format of <X>,<Current Value>\n so it can be read as a csv file
+                        String message = BluetoothApp.getDateString() + "," + BluetoothApp.getTimeStringWithColons() + "," + returnedValDouble + "," +
+                                Main2Activity.getValueSuffix(returnedVal) + "\n";
+                        try {
+                            outputStream.write(message.getBytes());
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    }
                 }
             }
         }
     };
 
-    //Checks that the data is valid (to prevent errors)
-    private boolean checkIfValidDouble(String s){
-        return (s.substring(0,1).equals("0") || s.substring(0,1).equals("-"));
-    }
 
     //Filters out the mA and micro symbols out of the string to get a valid double that displays
     private String getValidDouble(String s){
@@ -274,7 +339,6 @@ public class SecondaryGraph extends AppCompatActivity {
     }
 
     public void backToMain(View v){
-        trackTime.end();
         Intent intent = new Intent(this,Main2Activity.class);
         startActivity(intent);
     }

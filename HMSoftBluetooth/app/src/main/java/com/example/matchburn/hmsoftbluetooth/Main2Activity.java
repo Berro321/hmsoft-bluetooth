@@ -16,8 +16,11 @@ import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.os.Build;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.SystemClock;
+import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
@@ -32,16 +35,23 @@ import com.jjoe64.graphview.series.LineGraphSeries;
 
 import org.w3c.dom.Text;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOError;
 import java.io.IOException;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.List;
 import java.util.UUID;
-/*
-    Main Activity that will send Input to the board
 
-    Created by: Betto Cerrillos and Francisco Ramirez
+import static android.os.SystemClock.currentThreadTimeMillis;
+/*
+ *  Main Activity that will send Input to the board
+ *
+ *   Created by: Betto Cerrillos and Francisco Ramirez
  */
 
 public class Main2Activity extends AppCompatActivity {
@@ -52,6 +62,14 @@ public class Main2Activity extends AppCompatActivity {
     TextView showData;
     int counter = 0;
 
+    long startTime;
+    private boolean startedGraphing;
+
+    //Used for recording data
+    private File dirpath;
+    private FileOutputStream outputStream;
+    private boolean isRecording;
+
     //Needed for Bluetooth
     private int count; //Prevent from scanning forever
     private boolean readyTo;
@@ -59,7 +77,6 @@ public class Main2Activity extends AppCompatActivity {
     private BluetoothAdapter mBluetoothAdapter;
     private boolean mScanning;
     private Handler mHandler;
-    private boolean ThreadIsAlive = false;
 
     private ArrayList<String> deviceList;
     private static final int REQUEST_ENABLE_BT = 1;
@@ -68,7 +85,7 @@ public class Main2Activity extends AppCompatActivity {
     private static final String TAG = "Main2Activity";
 
     //Information about board
-    public static final String HMSoftAddress = "9C:1D:04:E0:BD";
+    public static final String HMSoftAddress = "9C:1D:58:04:E0:BD";
     public static final String HMSoftServ = "0000ffe0-0000-1000-8000-00805f9b34fb";
     public  static final String HMSoftChar = "0000ffe1-0000-1000-8000-00805f9b34fb";
 
@@ -87,7 +104,6 @@ public class Main2Activity extends AppCompatActivity {
     private LineGraphSeries<DataPoint> series;
     private double lastX = 0;
     private  GraphView graph;
-    private timerThread trackTime;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -129,7 +145,7 @@ public class Main2Activity extends AppCompatActivity {
             finish();
             return;
         }
-        checkBTPermissions();
+        checkBTAndWritePermissions();
         //Disable bluetooth, to restart it
         /*BluetoothAdapter mBluetoothAdapter2 = BluetoothAdapter.getDefaultAdapter();
         if (mBluetoothAdapter2.isEnabled()) {
@@ -149,27 +165,69 @@ public class Main2Activity extends AppCompatActivity {
         graph.getGridLabelRenderer().setLabelsSpace(3);
         graph.getGridLabelRenderer().setNumVerticalLabels(4);
 
-        trackTime = new timerThread();
+        //Setup the writing stream
+        outputStream = null;
     }
     @Override
     protected void onDestroy() {
         super.onDestroy();
         unbindService(mServiceConnection);
         mBluetoothLeService = null;
+        //Close writing file
+        try {
+            outputStream.close();
+            outputStream = null;
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 
+    /* Checks if external storage is available for read and write */
+    public boolean isExternalStorageWritable() {
+        String state = Environment.getExternalStorageState();
+        if (Environment.MEDIA_MOUNTED.equals(state)) {
+            return true;
+        }
+        return false;
     }
 
     //Check permissions of device
-    private void checkBTPermissions() {
+    private void checkBTAndWritePermissions() {
         if(Build.VERSION.SDK_INT > Build.VERSION_CODES.LOLLIPOP){
             int permissionCheck = this.checkSelfPermission("Manifest.permission.ACCESS_FINE_LOCATION");
             permissionCheck += this.checkSelfPermission("Manifest.permission.ACCESS_COARSE_LOCATION");
             if (permissionCheck != 0) {
 
-                this.requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION}, 1001); //Any number
+                this.requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.WRITE_EXTERNAL_STORAGE }, 1); //Any number
             }
         }else{
-            Log.d(TAG, "checkBTPermissions: No need to check permissions. SDK version < LOLLIPOP.");
+            Log.d(TAG, "checkBTandWritePermissions: No need to check permissions. SDK version < LOLLIPOP.");
+        }
+    }
+
+    @Override //Used for checking if the permissions were accepted and obtained
+    public void onRequestPermissionsResult(int requestCode,
+                                           String permissions[], int[] grantResults) {
+        switch (requestCode) {
+            case 1: {
+
+                // If request is cancelled, the result arrays are empty.
+                if (grantResults.length > 0
+                        && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+
+                    // permission was granted, yay! Do the
+                    // contacts-related task you need to do.
+                } else {
+
+                    // permission denied, boo! Disable the
+                    // functionality that depends on this permission.
+                    Toast.makeText(Main2Activity.this, "Permission denied to read your External storage or Location", Toast.LENGTH_SHORT).show();
+                }
+                return;
+            }
+
+            // other 'case' lines to check for other
+            // permissions this app might request
         }
     }
 
@@ -183,7 +241,7 @@ public class Main2Activity extends AppCompatActivity {
         Viewport viewport = graph.getViewport();
         viewport.setYAxisBoundsManual(true);
         viewport.setMinY(.01);
-        viewport.setMaxY(.04);
+        viewport.setMaxY(1.5);
         viewport.setXAxisBoundsManual(true);
         viewport.setMaxX(10);
         viewport.setMinX(0);
@@ -218,42 +276,50 @@ public class Main2Activity extends AppCompatActivity {
         }
 
         //Keep track of graph timing
-        if(ThreadIsAlive) {
+        /*if(ThreadIsAlive) {
             trackTime = new timerThread();
             trackTime.start();
-        }
+        }*/  //Not needed anymore (REMOVE MAYB)
 
-    }
-    private class timerThread extends Thread implements Runnable{
-        private volatile boolean exit = false;
-        @Override
-        public void run() {
-            // we go on forever
-            for (;;) {
-                if(exit)
-                    break;
-                runOnUiThread(new Runnable() {
-
-                    @Override
-                    public void run() {
-                        lastX += .1;
-                    }
-                });
-
-                // sleep to slow down the add of entries
-                //Not always 100% accurate TODO: different way
-                try {
-                    Thread.sleep(100);
-                } catch (InterruptedException e) {
-                    // manage error ...
-                    Log.i(TAG,"ERROR IN THREAD!");
-                }
+        //Create file to write on and starts writing
+        if(isExternalStorageWritable()) {
+            dirpath = createFile();
+            try {
+                outputStream = new FileOutputStream(dirpath);
+            } catch (FileNotFoundException e) {
+                e.printStackTrace();
+            }
+            isRecording = true;
+            //Write a header
+            String mess = "Date,Time,ITP Current, mA\n";
+            try {
+                //if(outputStream!=null)
+                    outputStream.write(mess.getBytes());
+            } catch (IOException e) {
+                e.printStackTrace();
             }
         }
-        public void end(){
-            exit = true;
-        }
+
+        startedGraphing = false;
     }
+
+    //Create a file to write on
+    private File createFile(){
+        String dateTime = "[" + BluetoothApp.getDateString() + " " + BluetoothApp.getTimeString() + "]";
+        //Toast.makeText(this,"Clicked!",Toast.LENGTH_LONG).show();
+        File Root = Environment.getExternalStorageDirectory();
+        File dir = new File(Root.getAbsolutePath() + "/HMSOFTOUT");
+        if(!dir.exists())
+            dir.mkdir();
+        File file = new File(dir,"ITP" + dateTime + ".txt");
+        try {
+            file.createNewFile();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return file;
+    }
+
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         // User chose not to enable Bluetooth.
@@ -268,8 +334,8 @@ public class Main2Activity extends AppCompatActivity {
     protected void onPause() {
         super.onPause();
         scanLeDevice(false);
-        trackTime.end();
-
+        //trackTime.end();
+        isRecording = false;
         //trackTime.interrupt();
     }
 
@@ -424,8 +490,8 @@ public class Main2Activity extends AppCompatActivity {
         //Make sure that the application is actually connected to the device
         if(BluetoothApp.getApplication().getService()==null)
             return;
-        //Make sure timer ends on time
-        trackTime.end();
+        //Also close the file if it is writing TODO
+
         Intent intent = new Intent(this,SecondaryGraph.class);
         startActivity(intent);
     }
@@ -476,23 +542,41 @@ public class Main2Activity extends AppCompatActivity {
                 String returnedVal = intent.getStringExtra(BluetoothLeService.EXTRA_DATA);
                 //remove the Ma to convert to an actual usable value
                 double returnedValDouble;
-                if(!ThreadIsAlive) {
-                    trackTime.start();
-                    ThreadIsAlive = true;
-                }
                 showData.setText(returnedVal);
                 if(checkIfValidDouble(returnedVal)){
                     //Log.i(TAG,"" +  lastX);
                     returnedValDouble = Double.parseDouble(getValidDouble(returnedVal));
-                    series.appendData(new DataPoint(lastX,returnedValDouble),true,12);
-
+                    if(!startedGraphing){
+                        startedGraphing = true;
+                        startTime = SystemClock.elapsedRealtime(); //Zero the time
+                    }
+                    double currentX =(SystemClock.elapsedRealtime() - startTime) / 1000.0;
+                    series.appendData(new DataPoint( currentX,returnedValDouble),true,12);
+                    //Record to file
+                    if(outputStream!=null && isRecording){
+                        double time = currentX;
+                        //In format of <X>,<Current Value>\n so it can be read as a csv file
+                        String message = BluetoothApp.getDateString() + "," + BluetoothApp.getTimeStringWithColons() + "," + returnedValDouble + "," +
+                            getValueSuffix(returnedVal) + "\n";
+                        try {
+                            outputStream.write(message.getBytes());
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    }
                 }
             }
         }
     };
 
-    private boolean checkIfValidDouble(String s){
-        return s.substring(0,1).equals("0");
+    //Check if incoming data is a double by checking if it has a digit
+    public static boolean checkIfValidDouble(String s){
+        //return s.substring(0,1).equals("0");
+        for(int i = 0; i < s.length(); i++)
+            if(s.charAt(i) == '.'){
+                return (Character.isDigit(s.charAt(i - 1)) && Character.isDigit(s.charAt(i+1)));
+            }
+        return false;
     }
 
     private String getValidDouble(String s){
@@ -504,6 +588,22 @@ public class Main2Activity extends AppCompatActivity {
             returnedString+=current;
         }
         return returnedString;
+    }
+
+    public static String getValueSuffix(String s){
+        String current = "";
+        for(int i = 0; i < s.length(); i++){
+            current = s.substring(i,i+1);
+            if(current.equals("μ") || current.equals("m"))
+                break;
+        }
+        switch(current){
+            case "μ":
+                return "μA";
+            case "m":
+                return "mA";
+        }
+        return "";
     }
 
     //Checks to see if it is the data from the board we need (current)
