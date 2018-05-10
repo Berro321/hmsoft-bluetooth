@@ -45,6 +45,7 @@ import static com.example.matchburn.hmsoftbluetooth.Main2Activity.HMSoftAddress;
  * Displays the graph once the sensors are ready
  *
  * TODO:
+ * //NEEDS TO BE TESTED****
  *  Make it return to ITP when exiting this activity (start at 0.1, send 1)
  *  Add ability to rename file when it is saved
  *  Make graph scrollable (Fix later)
