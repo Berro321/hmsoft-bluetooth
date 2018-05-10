@@ -39,7 +39,7 @@
         android:layout_height="55dp"
         android:layout_alignParentBottom="true"
         android:layout_alignStart="@+id/graphView"
-        android:onClick="backToMain"
+        android:onClick="setupReturnToMain"
         android:text="Go back"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintHorizontal_bias="0.168"

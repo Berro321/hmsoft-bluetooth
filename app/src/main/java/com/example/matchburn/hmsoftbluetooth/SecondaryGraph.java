@@ -116,7 +116,6 @@ public class SecondaryGraph extends AppCompatActivity {
         //graph.getGridLabelRenderer().setLabelsSpace(3);
         graph.getGridLabelRenderer().setNumVerticalLabels(4);
         graph.getViewport().setScrollable(true);
-
     }
 
     @Override
@@ -381,13 +380,13 @@ public class SecondaryGraph extends AppCompatActivity {
         return returnedString;
     }
 
-    public void backToMain(View v){
-        backToMain();
+    public void setupReturnToMain(View v){
+        promptInputRenameFile();
     }
     public void backToMain(){
         //Write back to the main TEST
         BluetoothGattCharacteristic bluetoothGattCharacteristicHM_SOFT = BluetoothApp.getApplication().getGattCharacteristic(); //Grab characteristic
-        bluetoothGattCharacteristicHM_SOFT.setValue("1");
+        bluetoothGattCharacteristicHM_SOFT.setValue("1"); //Reset to ITP
         mBluetoothLeService.writeCharacteristic(bluetoothGattCharacteristicHM_SOFT);
         mBluetoothLeService.setCharacteristicNotification(bluetoothGattCharacteristicHM_SOFT, true);
 
