@@ -45,9 +45,6 @@ import static com.example.matchburn.hmsoftbluetooth.Main2Activity.HMSoftAddress;
  * Displays the graph once the sensors are ready
  *
  * TODO:
- * //NEEDS TO BE TESTED****
- *  Make it return to ITP when exiting this activity (start at 0.1, send 1)
- *  Add ability to rename file when it is saved
  *  Make graph scrollable (Fix later)
  */
 
@@ -115,26 +112,6 @@ public class SecondaryGraph extends AppCompatActivity {
         //graph.getGridLabelRenderer().setLabelHorizontalHeight(20);
         //graph.getGridLabelRenderer().setLabelVerticalWidth(30);
         //graph.getGridLabelRenderer().setLabelsSpace(3);
-        graph.getGridLabelRenderer().setNumVerticalLabels(4);
-        graph.getViewport().setScrollable(true);
-    }
-
-    @Override
-    public void onResume(){
-        super.onResume();
-        // Ensures Bluetooth is enabled on the device.  If Bluetooth is not currently enabled,
-        // fire an intent to display a dialog asking the user to grant permission to enable it.
-        if (!mBluetoothAdapter.isEnabled()) {
-            if (!mBluetoothAdapter.isEnabled()) {
-                Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
-                startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT);
-            }
-        }
-
-        //For the graph
-        graph.removeAllSeries();
-        series.resetData(new DataPoint[]{});
-        graph.addSeries(series);
         Viewport viewport = graph.getViewport();
         viewport.setYAxisBoundsManual(true);
         viewport.setMinY(-12);
@@ -142,6 +119,8 @@ public class SecondaryGraph extends AppCompatActivity {
         viewport.setXAxisBoundsManual(true);
         viewport.setMaxX(10);
         viewport.setMinX(0);
+        graph.getGridLabelRenderer().setNumVerticalLabels(4);
+        graph.getViewport().setScrollable(true);
         startedGraphing = false;
 
         //Create file to write on and starts writing
@@ -154,11 +133,24 @@ public class SecondaryGraph extends AppCompatActivity {
             }
             isRecording = true;
             //Write a header
-            String mess = "Date,Time,Sensing Current,µA\n";
+            String mess = "Date,Time,Seconds,Sensing Current,µA\n";
             try{
                 outputStream.write(mess.getBytes());
             } catch (IOException e) {
                 e.printStackTrace();
+            }
+        }
+    }
+
+    @Override
+    public void onResume(){
+        super.onResume();
+        // Ensures Bluetooth is enabled on the device.  If Bluetooth is not currently enabled,
+        // fire an intent to display a dialog asking the user to grant permission to enable it.
+        if (!mBluetoothAdapter.isEnabled()) {
+            if (!mBluetoothAdapter.isEnabled()) {
+                Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
+                startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT);
             }
         }
     }
@@ -182,7 +174,7 @@ public class SecondaryGraph extends AppCompatActivity {
     public void onPause(){
         super.onPause();
         //trackTime.end();
-        isRecording = false; //Stop recording when not in foreground
+        //isRecording = false; //Stop recording when not in foreground
     }
 
     //Check permissions of device
@@ -322,8 +314,8 @@ public class SecondaryGraph extends AppCompatActivity {
                     double currentX = (SystemClock.elapsedRealtime() - startTime) / 1000.0;
                     series.appendData(new DataPoint(currentX,returnedValDouble),true,12);
                     if(outputStream!=null && isRecording){
-                        //In format of <X>,<Current Value>\n so it can be read as a csv file
-                        String message = BluetoothApp.getDateString() + "," + BluetoothApp.getTimeStringWithColons() + "," + returnedValDouble + "," +
+                        //In format of <Date>,<Time>,<seconds after start>,<Current Value>\n so it can be read as a csv file
+                        String message = BluetoothApp.getDateString() + "," + BluetoothApp.getTimeStringWithColons() + "," + currentX + "," + returnedValDouble + "," +
                                 Main2Activity.getValueSuffix(returnedVal) + "\n";
                         try {
                             outputStream.write(message.getBytes());
@@ -337,6 +329,7 @@ public class SecondaryGraph extends AppCompatActivity {
     };
 
     private void promptInputRenameFile(){
+        isRecording = false;
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("Rename File?");
         final EditText textInput = new EditText(this);

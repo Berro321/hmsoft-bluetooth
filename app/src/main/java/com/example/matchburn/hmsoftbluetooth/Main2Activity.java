@@ -60,7 +60,6 @@ import static android.os.SystemClock.currentThreadTimeMillis;
  *
  *   Created by: Betto Cerrillos and Francisco Ramirez
  *   TODO:
- *      Add newly added functionalities to Secondary Graph
  *      Fix graph scroll update so it only updates the window to the most recent if the user
  *          is scrolled to the most recent. Otherwise if they scroll to earlier values, the window
  *          does not update.
@@ -272,6 +271,25 @@ public class Main2Activity extends AppCompatActivity {
             }
         }
         Log.i(TAG, "HMSoftAddress: " + HMSoftAddress + "\nService: " + HMSoftServ + "\nChar: " + HMSoftChar + "\n");
+
+        //Create file to write on and starts writing
+        if(isExternalStorageWritable()) {
+            dirpath = createFile();
+            try {
+                outputStream = new FileOutputStream(dirpath);
+            } catch (FileNotFoundException e) {
+                e.printStackTrace();
+            }
+            isRecording = true;
+            //Write a header
+            String mess = "Date,Time,Seconds,ITP Current, mA\n";
+            try {
+                //if(outputStream!=null)
+                outputStream.write(mess.getBytes());
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
     }
     @Override
     protected void onDestroy() {
@@ -370,24 +388,6 @@ public class Main2Activity extends AppCompatActivity {
             }
         }
 
-        //Create file to write on and starts writing
-        if(isExternalStorageWritable()) {
-            dirpath = createFile();
-            try {
-                outputStream = new FileOutputStream(dirpath);
-            } catch (FileNotFoundException e) {
-                e.printStackTrace();
-            }
-            isRecording = true;
-            //Write a header
-            String mess = "Date,Time,Seconds,ITP Current, mA\n";
-            try {
-                //if(outputStream!=null)
-                    outputStream.write(mess.getBytes());
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
     }
 
     //Create a file to write on
@@ -424,7 +424,7 @@ public class Main2Activity extends AppCompatActivity {
         super.onPause();
         scanLeDevice(false);
         //trackTime.end();
-        isRecording = false;
+        //isRecording = false;
         //trackTime.interrupt();
     }
 
@@ -575,12 +575,12 @@ public class Main2Activity extends AppCompatActivity {
         if(n <= 9)
             return Integer.toString(n);
         //Assuming ASCII encoding
-        return "a" + (n - 10); //Returns a b c e f
+        int ch = 'a' + (n-10);
+        return Character.toString((char) ch); //Returns a b c e f
     }
 
 
     public void startSensingClick(View v){
-        sendData(0);
         Log.i(TAG,"Start sensing button clicked");
         if(foundChar)
             startGraph();
@@ -601,6 +601,7 @@ public class Main2Activity extends AppCompatActivity {
     }
 
     private void startSensingGraph(){
+        sendData(0);
         Log.i(TAG,"Currently calling Secondary Graph..");
         Intent intent = new Intent(this,SecondaryGraph.class);
         startActivity(intent);
@@ -631,6 +632,7 @@ public class Main2Activity extends AppCompatActivity {
     }
 
     private void promptInputRenameFile(){
+        isRecording = false; //Stop recording
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("Rename File?");
         final EditText textInput = new EditText(this);
@@ -665,7 +667,7 @@ public class Main2Activity extends AppCompatActivity {
     private void sendData(int dataInt){
         if(!foundChar)
             return;
-        Log.i(TAG,"Sent data " + dataInt);
+        Log.i(TAG,"Sent data " + intToStringHex(dataInt));
         bluetoothGattCharacteristicHM_SOFT.setValue(intToStringHex(dataInt));
         mBluetoothLeService.writeCharacteristic(bluetoothGattCharacteristicHM_SOFT);
         mBluetoothLeService.setCharacteristicNotification(bluetoothGattCharacteristicHM_SOFT, true);
@@ -720,9 +722,9 @@ public class Main2Activity extends AppCompatActivity {
                     series.appendData(new DataPoint( currentX,returnedValDouble),true,500);
                     //Record to file
                     if(outputStream!=null && isRecording){
-                        //In format of <date>,<time>, <Current Value>, <suffix>, <seconds after start>\n so it can be read as a csv file
-                        String message = BluetoothApp.getDateString() + "," + BluetoothApp.getTimeStringWithColons() + "," + returnedValDouble + "," +
-                            getValueSuffix(returnedVal) + "," + currentX +"\n";
+                        //In format of <date>,<time>,<seconds after start>, <Current Value>, <suffix>,\n so it can be read as a csv file
+                        String message = BluetoothApp.getDateString() + "," + BluetoothApp.getTimeStringWithColons() + "," + currentX + "," + returnedValDouble + "," +
+                            getValueSuffix(returnedVal) + "\n";
                         try {
                             outputStream.write(message.getBytes());
                         } catch (IOException e) {
@@ -756,16 +758,12 @@ public class Main2Activity extends AppCompatActivity {
     }
 
     public static String getValueSuffix(String s){
-        String current = "";
+        String current;
         for(int i = 0; i < s.length(); i++){
             current = s.substring(i,i+1);
-            if(current.equals("μ") || current.equals("m"))
-                break;
-        }
-        switch(current){
-            case "μ":
+            if(current.equals("μ"))
                 return "μA";
-            case "m":
+            if(current.equals("m"))
                 return "mA";
         }
         return "";
