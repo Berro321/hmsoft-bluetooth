@@ -35,6 +35,7 @@ import android.widget.Toast;
 
 import com.jjoe64.graphview.GraphView;
 import com.jjoe64.graphview.Viewport;
+import com.jjoe64.graphview.Viewport.OnXAxisBoundsChangedListener;
 import com.jjoe64.graphview.series.DataPoint;
 import com.jjoe64.graphview.series.LineGraphSeries;
 
@@ -66,6 +67,7 @@ import static android.os.SystemClock.currentThreadTimeMillis;
  */
 
 public class Main2Activity extends AppCompatActivity {
+    private final Boolean DEBUG_MODE = false;
 
     View view;
 
@@ -118,6 +120,7 @@ public class Main2Activity extends AppCompatActivity {
     private LineGraphSeries<DataPoint> series;
     private double lastX = 0;
     private  GraphView graph;
+    private Boolean updateViewportRecent;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -130,6 +133,7 @@ public class Main2Activity extends AppCompatActivity {
         readyTo = false; //Track once it's connected
         foundChar = false;
         mShouldUnbind = false;
+        updateViewportRecent = true;
 
         view = this.getWindow().getDecorView();
         view.setBackgroundResource(R.color.Blue);
@@ -290,6 +294,17 @@ public class Main2Activity extends AppCompatActivity {
                 e.printStackTrace();
             }
         }
+
+        //Set listener when x Axis is changed when scrolled
+        graph.getViewport().setOnXAxisBoundsChangedListener(new OnXAxisBoundsChangedListener() {
+            @Override
+            public void onXAxisBoundsChanged(double minX, double maxX, Reason reason) {
+                Log.i(TAG,"Graph has scrolled!" + minX + " ,max: " + maxX + "\nSeriesListmax: "
+                 + series.getHighestValueX());
+                //If user scrolls to end == update every new incoming value (TODO: make it user responsive)
+                updateViewportRecent = (maxX == series.getHighestValueX());
+            }
+        });
     }
     @Override
     protected void onDestroy() {
@@ -514,8 +529,15 @@ public class Main2Activity extends AppCompatActivity {
         }
     };
 
+    private int test_count = 0;
     public void countIN (View v) {
         //Max number: 15 ( 0...9 a b c d e f)
+        //REMOVE LAtER
+        if(DEBUG_MODE){
+            series.appendData(new DataPoint(test_count,test_count / 10.0),updateViewportRecent,200);
+            test_count++;
+            Log.i(TAG,graph.getViewport().getXAxisBoundsStatus().toString());
+        }
         if(counter >= 15){
             return;
         }
@@ -538,6 +560,8 @@ public class Main2Activity extends AppCompatActivity {
         sendData(counter);
         //Toast.makeText(getApplicationContext(),String.valueOf(counter),Toast.LENGTH_LONG).show();
     }
+
+    //TESTING on axis bound listener
 
     public double intToDouble(int num){
        return (double)num/10; //Maybe remove
@@ -719,7 +743,7 @@ public class Main2Activity extends AppCompatActivity {
                     }
                     double currentX =(SystemClock.elapsedRealtime() - startTime) / 1000.0;
                     //Log.i(TAG,"Current x: "+Double.toString(currentX));
-                    series.appendData(new DataPoint( currentX,returnedValDouble),true,500);
+                    series.appendData(new DataPoint( currentX,returnedValDouble),updateViewportRecent,500);
                     //Record to file
                     if(outputStream!=null && isRecording){
                         //In format of <date>,<time>,<seconds after start>, <Current Value>, <suffix>,\n so it can be read as a csv file
