@@ -69,6 +69,7 @@ public class SecondaryGraph extends AppCompatActivity {
     private  GraphView graph;
     private long startTime;
     private boolean startedGraphing;
+    private boolean updateViewportRecent;
 
     @Override
     protected void onCreate(Bundle savedInstance){
@@ -77,6 +78,8 @@ public class SecondaryGraph extends AppCompatActivity {
 
         view = this.getWindow().getDecorView();
         view.setBackgroundResource(R.color.Blue);
+
+        updateViewportRecent = false;
 
         showValue = (TextView) findViewById(R.id.data_bar);
         getSupportActionBar().setTitle(R.string.title_devices);
@@ -140,6 +143,16 @@ public class SecondaryGraph extends AppCompatActivity {
                 e.printStackTrace();
             }
         }
+        //Set listener when x Axis is changed when scrolled
+        graph.getViewport().setOnXAxisBoundsChangedListener(new Viewport.OnXAxisBoundsChangedListener() {
+            @Override
+            public void onXAxisBoundsChanged(double minX, double maxX, Reason reason) {
+                Log.i(TAG,"Graph has scrolled!" + minX + " ,max: " + maxX + "\nSeriesListmax: "
+                        + series.getHighestValueX());
+                //If user scrolls to end == update every new incoming value (TODO: make it user responsive)
+                updateViewportRecent = (maxX == series.getHighestValueX());
+            }
+        });
     }
 
     @Override
@@ -312,7 +325,7 @@ public class SecondaryGraph extends AppCompatActivity {
                         startTime = SystemClock.elapsedRealtime(); //zero time
                     }
                     double currentX = (SystemClock.elapsedRealtime() - startTime) / 1000.0;
-                    series.appendData(new DataPoint(currentX,returnedValDouble),true,12);
+                    series.appendData(new DataPoint(currentX,returnedValDouble),updateViewportRecent,500);
                     if(outputStream!=null && isRecording){
                         //In format of <Date>,<Time>,<seconds after start>,<Current Value>\n so it can be read as a csv file
                         String message = BluetoothApp.getDateString() + "," + BluetoothApp.getTimeStringWithColons() + "," + currentX + "," + returnedValDouble + "," +
